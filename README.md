@@ -4,7 +4,7 @@ A clientprefs extension for sourcemod using Redis as backend.
 
 This plugin is truly mutilthreaded. 
 
-Unlike the offical clientprefs only use signle thread for query and getting stuck if there are too many cookies (or other SQL queries), this implementation use a lock-free queue ([Thanks to Cameron](https://github.com/cameron314/concurrentqueue)) to minimize delay and maximun QPS.
+Unlike the offical clientprefs only use signle thread for query and getting stuck if there are too many cookies (or other SQL queries), this implementation use a lock-free queue ([Thanks to Cameron](https://github.com/cameron314/concurrentqueue)) to minimize delay and a thread pool to minimize delay and maximize QPS.
 
 Most clients are able to get their cookies before they finish loading the maps, even with 64 player and thousands of cookies, which the orginial implementation can take more than 10 minutes to load.
 
@@ -55,3 +55,7 @@ You need to enable C++17 feature to complie the code.
 ## Linux
 
 // TODO
+
+# Benchmark
+
+See the code [here](https://github.com/kice/clientprefs-redis/blob/master/addons/sourcemod/scripting/cookiesSpeedTest.sp)
