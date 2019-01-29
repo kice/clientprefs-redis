@@ -59,3 +59,7 @@ You need to enable C++17 feature to complie the code.
 # Benchmark
 
 See the code [here](https://github.com/kice/clientprefs-redis/blob/master/addons/sourcemod/scripting/cookiesSpeedTest.sp)
+
+# Also see
+
+[A Hiredis warpper for Sourcemod](https://github.com/kice/sm_hiredis/tree/master)
