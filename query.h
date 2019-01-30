@@ -40,22 +40,27 @@
 #include <vector>
 #include <string>
 
-#define GET_CLIENT_COOKIES R"(local a={}for b,c in ipairs(redis.call('SMEMBERS','cookies.list'))do a[b]={c,redis.call('GET',string.format('cookies.desc.%s',c)),redis.call('GET',string.format('cookies.access.%s',c)),redis.call('GET',string.format('%s.%s',KEYS[1],redis.call('GET','cookies.id.'..c)))}end;return a)"
-#define GET_CLIENT_COOKIES_SHA "13d65c94f4af4aeb01b671b810e314c65fa426f2"
+#define GET_CLIENT_COOKIES R"(local a={}for b,c in ipairs(redis.call('SMEMBERS','cookies.list'))do local d=redis.call('GET','cookies.id.'..c)if d==false then redis.call('SREM','cookies.list',c)else table.insert(a,{c,redis.call('GET',string.format('cookies.desc.%s',c)),redis.call('GET',string.format('cookies.access.%s',c)),redis.call('GET',string.format('%s.%s',KEYS[1],d))})end end;return a)"
+#define GET_CLIENT_COOKIES_SHA "2e80a3ad95e151c8466c622a382586fab9d9f9b1"
 
  /*
---  local cookies = {}
+-- local cookies = {}
 
---  for idx, name in ipairs(redis.call('SMEMBERS', 'cookies.list')) do
---      cookies[idx] = {
---          name,
---          redis.call('GET', string.format('cookies.desc.%s', name)),
---          redis.call('GET', string.format('cookies.access.%s', name)),
---          redis.call('GET', string.format('%s.%s', KEYS[1], redis.call('GET', 'cookies.id.' .. name)))
---      }
---  end
+-- for idx, name in ipairs(redis.call('SMEMBERS', 'cookies.list')) do
+--     local id = redis.call('GET', 'cookies.id.' .. name)
+--     if id == false then
+--         redis.call('SREM', 'cookies.list', name)
+--     else
+--         table.insert(cookies, {
+--             name,
+--             redis.call('GET', string.format('cookies.desc.%s', name)),
+--             redis.call('GET', string.format('cookies.access.%s', name)),
+--             redis.call('GET', string.format('%s.%s', KEYS[1], id))
+--         })
+--     end
+-- end
 
---  return cookies
+-- return cookies
  */
 
 enum querytype
