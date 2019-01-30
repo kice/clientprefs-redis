@@ -22,8 +22,8 @@ public void OnClientCookiesCached(int client)
     if (fEngTime_PutInServer[client] <= 0.0) {
         LogToFileEx(szLogPath, "%N Cookies Loaded before PutInServer, %.2fs after connected.", client, now - fConnected[client]);
     } else {
-        float delta1 = now - fPutInServer[client];
-        float delta2 = now - fConnected[client];
+        float delta1 = now - fConnected[client];
+        float delta2 = now - fPutInServer[client];
         LogToFileEx(szLogPath, "%N Cookies Loaded %.2fs after connected, %.2f after PutInServer", client, delta1, delta2);
     }
 }
