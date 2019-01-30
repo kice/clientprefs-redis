@@ -173,10 +173,10 @@ public:
 
     TQueue *tqq = nullptr;
     std::string host;
+    std::string pass;
     int port;
     int maxTimeout;
     int dbid;
-    std::string pass;
 
     IPhraseCollection *phrases;
 
@@ -186,6 +186,8 @@ private:
     ke::Vector<TQueryOp *> cachedQueries;
     ke::Mutex queryLock;
     IdentityToken_t *identity;
+
+    std::mutex connectLock;
 
     int worker;
 };

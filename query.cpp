@@ -36,24 +36,6 @@
 #define CookieAcce  2
 #define CookieValue 3
 
-#define GET_CLIENT_COOKIES "local a={}for b,c in ipairs(redis.call('KEYS','cookies.id.*'))do local d=string.sub(c,12)a[b]={d,redis.call('GET',string.format('cookies.desc.%s',d)),redis.call('GET',string.format('cookies.access.%s',d)),redis.call('GET',string.format('%s.%s',KEYS[1],redis.call('GET',c)))}end;return a"
-
- /*
- -- local cookies = {}
-
- -- for idx, key in ipairs(redis.call('KEYS', 'cookies.id.*')) do
- --     local name = string.sub(key, 12)
- --     cookies[idx] = {
- --         name,
- --         redis.call('GET', string.format('cookies.desc.%s', name)),
- --         redis.call('GET', string.format('cookies.access.%s', name)),
- --         redis.call('GET', string.format('%s.%s', KEYS[1], redis.call('GET', key)))
- --     }
- -- end
-
- -- return cookies
- */
-
 #include <functional>
 #include <string>
 
@@ -94,7 +76,7 @@ void TQueryOp::RunThinkPart()
 void TQueryOp::RunThreadPart()
 {
     if (m_type == Query_Connect) {
-        // g_ClientPrefs.DatabaseConnect();
+        g_ClientPrefs.DatabaseConnect();
         return;
     }
 
@@ -166,6 +148,7 @@ bool TQueryOp::BindParamsAndRun()
 
         auto rep = m_database->Run("GET %s", "cookies.id." + safe_name); // check if we have that cookie
         if (rep.type == REDIS_REPLY_STRING) {
+            m_database->Execute("SADD cookies.list %s", safe_name.c_str());
             m_insertId = std::stoi(rep.str);
             return true;
         }
@@ -175,6 +158,7 @@ bool TQueryOp::BindParamsAndRun()
         std::string key_id = "cookies.id." + safe_name;
 
         if (m_database->CanAsync()) {
+            m_database->CommandAsync("SADD cookies.list %s", safe_name.c_str());
             m_database->CommandAsync("SET %s %d", key_name.c_str(), (int)m_params.cookie->access); // access
             m_database->CommandAsync("SET %s %s", key_desc.c_str(), safe_desc.c_str()); // description
             m_database->CommandAsync("SET %s %d", key_id.c_str(), id); // id
@@ -182,17 +166,20 @@ bool TQueryOp::BindParamsAndRun()
             return true;
         }
 
+        if (!m_database->Execute("SADD cookies.list %s", safe_name.c_str())) {
+            g_pSM->LogError(myself, "Cannot add \"%s\" to cookies.list", safe_name.c_str());
+        }
         m_database->Command("SET %s %d", key_name.c_str(), (int)m_params.cookie->access); // access
         m_database->Command("SET %s %s", key_desc.c_str(), safe_desc.c_str()); // description
         m_database->Command("SET %s %d", key_id.c_str(), id); // id
 
-        auto res = m_database->GetReplies(3);
-        if (res.size() != 3) {
-            g_pSM->LogError(myself, "Expect 3 replies but got %d", res.size());
+        auto replies = m_database->GetReplies(3);
+        if (replies.size() != 3) {
+            g_pSM->LogError(myself, "Expect 3 replies but got %d", replies.size());
         }
 
         bool bsucc = true;
-        for (const auto &reply : res) {
+        for (const auto &reply : replies) {
             if (reply.type != REDIS_REPLY_STATUS) {
                 g_pSM->LogError(myself, "Expect REDIS_REPLY_STATUS reply but got %d", reply.type);
             } else if (reply.str != "OK") {
@@ -206,42 +193,44 @@ bool TQueryOp::BindParamsAndRun()
 
     case Query_SelectData:
     {
+        m_results.clear();
         std::string steamId = m_params.steamId;
 
-        // Try Lua query first
-        auto cookies = m_database->Run("EVAL %s %d %s", GET_CLIENT_COOKIES, 1, steamId.c_str());
-        if (cookies.type == REDIS_REPLY_ARRAY && cookies.reply_array.size() > 0) {
-            for (const auto &cookieData : cookies.reply_array) {
-                if (cookieData.type != REDIS_REPLY_ARRAY || cookieData.reply_array.size() != 4) {
-                    break;
+        auto luaquery = [&] {
+            // Try to use cached Lua query first
+            auto cookies = m_database->Run("EVALSHA %s %d %s", GET_CLIENT_COOKIES_SHA, 1, steamId.c_str());
+            if (cookies.type == REDIS_REPLY_ARRAY && cookies.reply_array.size() > 0) {
+                for (const auto &cookieData : cookies.reply_array) {
+                    if (cookieData.type != REDIS_REPLY_ARRAY || cookieData.reply_array.size() != 4) {
+                        break;
+                    }
+
+                    const auto &cookie = cookieData.reply_array;
+
+                    CookieAccess acce;
+                    try {
+                        acce = (CookieAccess)std::stoi(cookie[CookieAcce].str);
+                    } catch (const std::exception&) {
+                        acce = CookieAccess_Public;
+                    }
+
+                    m_results.push_back({
+                        Cookie(
+                            cookie[CookieName].str.data(),
+                            cookie[CookieDesc].str.data(),
+                            acce
+                        ),
+                        cookie[CookieValue].str.data()
+                        });
                 }
-
-                const auto &cookie = cookieData.reply_array;
-
-                CookieAccess acce;
-                try {
-                    acce = (CookieAccess)std::stoi(cookie[CookieAcce].str);
-                } catch (const std::exception&) {
-                    acce = CookieAccess_Public;
-                }
-
-                m_results.push_back({
-                    Cookie(
-                        cookie[CookieName].str.data(),
-                        cookie[CookieDesc].str.data(),
-                        acce
-                    ),
-                    cookie[CookieValue].str.data()
-                    });
             }
-        }
+        };
 
         if (m_results.size()) {
             return true;
         }
 
-        m_results.clear();
-        // Use normal method
+        // Use normal and slow method
         auto keys = m_database->Run("KEYS cookies.id.*");
         for (const auto &item : keys.reply_array) {
             std::string cookieName = item.str.substr(11);

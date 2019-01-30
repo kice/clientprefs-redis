@@ -53,9 +53,9 @@ ASyncRedis::ASyncRedis(int _intval, int cache)
     cache_size = cache;
 
     loop = aeCreateEventLoop(1024 * 10);
-    evMain = std::thread([this] {
-        aeCreateTimeEvent(loop, interval, timeEventCallback, this, nullptr);
+    aeCreateTimeEvent(loop, interval, timeEventCallback, this, nullptr);
 
+    evMain = std::thread([this] {
         aeMain(loop);
         aeDeleteEventLoop(loop);
         loop = nullptr;

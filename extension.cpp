@@ -88,20 +88,19 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
         pass = DBInfo->pass;
     }
 
+    if (DBInfo->database == nullptr || DBInfo->database[0] != '\x0') {
+        dbid = 0;
+    } else {
+        dbid = atoi(DBInfo->database);
+    }
+
     tqq = new TQueue();
 
     const char *num_worker = smutils->GetCoreConfigValue("RedisQueryThread");
     if (num_worker == NULL) {
-        worker = 1;
+        worker = 4;
     } else {
         worker = atoi(num_worker);
-    }
-
-    const char *num_dbid = smutils->GetCoreConfigValue("RedisDBId");
-    if (num_dbid == NULL) {
-        dbid = 0;
-    } else {
-        dbid = atoi(num_dbid);
     }
 
     bool noasync = false;
@@ -110,30 +109,41 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
         noasync = atoi(_noasync) != 0;
     }
 
-    smutils->LogMessage(myself, "Connecting to %s:%d %s password using %d query thread(s).", host.c_str(), port, pass.empty() ? "without" : "with", worker);
+    smutils->LogMessage(myself, "Connecting to %s:%d %s password using %d query thread(s).",
+        host.c_str(), port, pass.empty() ? "without" : "with", worker);
+
     for (int i = 0; i < worker; ++i) {
         std::thread([this, i, noasync] {
             RedisDB *db = nullptr;
             auto connectDb = [&]() {
                 while (db == nullptr) {
-                    db = RedisDB::GetRedisDB(host, port, maxTimeout, pass);
-
                     Sleep(3000);
+
+                    std::unique_lock<std::mutex> _(connectLock);
+                    db = RedisDB::GetRedisDB(host, port, maxTimeout, pass);
                     if (noasync) {
                         continue;
                     }
 
                     if (int err = db->ConnectAsync(host, port, pass)) {
-                        smutils->LogMessage(myself, "[%d] Cannot use async connection: %d (error: %s).", i, err, db->GetASyncErrorStr());
+                        smutils->LogError(myself, "[%d] Cannot use async connection: %d (error: %s).",
+                            i, err, db->GetASyncErrorStr());
                     } else {
                         // Async connection is available
-                        smutils->LogMessage(myself, "[%d] Connected to %s:%d with non-blocking context.", i, host, port);
+                        smutils->LogMessage(myself, "[%d] Connected to %s:%d with non-blocking context.",
+                            i, host.c_str(), port);
                     }
                 }
             };
 
-            connectDb();
-            db->SELECT_DBID(dbid);
+            {
+                connectDb();
+                auto reply = db->Run("SCRIPT LOAD %s", GET_CLIENT_COOKIES);
+                if (reply.str != GET_CLIENT_COOKIES_SHA) {
+                    smutils->LogError(myself, "Lua script sha dose not match: except:%s actual:%s",
+                        GET_CLIENT_COOKIES_SHA, reply.str.c_str());
+                }
+            }
 
             while (true) {
                 auto op = tqq->GetQuery();
@@ -146,9 +156,9 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
                     delete db;
                     db = nullptr;
                     connectDb();
-                    db->SELECT_DBID(dbid);
                 }
 
+                db->SELECT_DBID(dbid);
                 op->SetDatabase(db);
                 op->RunThreadPart();
                 tqq->PutResult(op);

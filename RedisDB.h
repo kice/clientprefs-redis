@@ -160,7 +160,6 @@ public:
             sprintf(buf, "SELECT %d", dbid);
             async.Command(buf);
         }
-
         return true;
     }
 

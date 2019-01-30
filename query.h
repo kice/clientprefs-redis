@@ -8,7 +8,7 @@
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 3.0, as published by the
  * Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
@@ -40,13 +40,31 @@
 #include <vector>
 #include <string>
 
+#define GET_CLIENT_COOKIES R"(local a={}for b,c in ipairs(redis.call('SMEMBERS','cookies.list'))do a[b]={c,redis.call('GET',string.format('cookies.desc.%s',c)),redis.call('GET',string.format('cookies.access.%s',c)),redis.call('GET',string.format('%s.%s',KEYS[1],redis.call('GET','cookies.id.'..c)))}end;return a)"
+#define GET_CLIENT_COOKIES_SHA "13d65c94f4af4aeb01b671b810e314c65fa426f2"
+
+ /*
+--  local cookies = {}
+
+--  for idx, name in ipairs(redis.call('SMEMBERS', 'cookies.list')) do
+--      cookies[idx] = {
+--          name,
+--          redis.call('GET', string.format('cookies.desc.%s', name)),
+--          redis.call('GET', string.format('cookies.access.%s', name)),
+--          redis.call('GET', string.format('%s.%s', KEYS[1], redis.call('GET', 'cookies.id.' .. name)))
+--      }
+--  end
+
+--  return cookies
+ */
+
 enum querytype
 {
-	Query_InsertCookie = 0,
-	Query_SelectData,
-	Query_InsertData,
-	Query_SelectId,
-	Query_Connect,
+    Query_InsertCookie = 0,
+    Query_SelectData,
+    Query_InsertData,
+    Query_SelectId,
+    Query_Connect,
 };
 
 struct Cookie;
@@ -56,66 +74,65 @@ struct CookieData;
 /* This stores all the info required for our param binding until the thread is executed */
 struct ParamData
 {
-	ParamData();
+    ParamData();
 
-	~ParamData();
+    ~ParamData();
 
-	/* Contains a name, description and access for InsertCookie queries */
-	Cookie *cookie;
-	/* A clients steamid - Used for most queries - Doubles as storage for the cookie name*/
-	char steamId[MAX_NAME_LENGTH];
+    /* Contains a name, description and access for InsertCookie queries */
+    Cookie *cookie;
+    /* A clients steamid - Used for most queries - Doubles as storage for the cookie name*/
+    char steamId[MAX_NAME_LENGTH];
 
-	int cookieId;
-	CookieData *data;
+    int cookieId;
+    CookieData *data;
 };
 
 class TQueryOp : public IThreadQuery
 {
 public:
-	TQueryOp(enum querytype type, int serial);
-	TQueryOp(enum querytype type, Cookie *cookie);
-	~TQueryOp() {}
+    TQueryOp(enum querytype type, int serial);
+    TQueryOp(enum querytype type, Cookie *cookie);
+    ~TQueryOp() {}
 
-	// IDBDriver *GetDriver();
-	IdentityToken_t *GetOwner();
+    // IDBDriver *GetDriver();
+    IdentityToken_t *GetOwner();
 
-	void SetDatabase(void *db);
+    void SetDatabase(void *db);
 
-	void Destroy();
+    void Destroy();
 
-	void RunThreadPart();
-	/* Thread has been cancelled due to driver unloading. Nothing else to do? */
-	void CancelThinkPart()	{}
-	void RunThinkPart();
+    void RunThreadPart();
+    /* Thread has been cancelled due to driver unloading. Nothing else to do? */
+    void CancelThinkPart() {}
+    void RunThinkPart();
 
-	bool BindParamsAndRun();
+    bool BindParamsAndRun();
 
-	/* Params to be bound */
-	ParamData m_params;
+    /* Params to be bound */
+    ParamData m_params;
 
-	inline RedisDB *GetDB()
-	{
-		return m_database;
-	}
-	
+    inline RedisDB *GetDB()
+    {
+        return m_database;
+    }
+
 public:
-	querytype PullQueryType();
-	int PullQuerySerial();
+    querytype PullQueryType();
+    int PullQuerySerial();
 
 private:
-	RedisDB *m_database;
-	// IDBDriver *m_driver;
-	// IQuery *m_pResult;
-	std::vector<std::pair<Cookie, std::string>> m_results;
+    RedisDB *m_database;
+    // IDBDriver *m_driver;
+    // IQuery *m_pResult;
+    std::vector<std::pair<Cookie, std::string>> m_results;
 
-	/* Query type */
-	enum querytype m_type;
+    /* Query type */
+    enum querytype m_type;
 
-	/* Data to be passed to the callback */
-	int m_serial;
-	int m_insertId;
-	Cookie *m_pCookie;
+    /* Data to be passed to the callback */
+    int m_serial;
+    int m_insertId;
+    Cookie *m_pCookie;
 };
-
 
 #endif // _INCLUDE_SOURCEMOD_CLIENTPREFS_QUERY_H_
