@@ -74,8 +74,8 @@ ASyncRedis::~ASyncRedis()
         evMain.join();
     }
 
-    if (ac) {
-        redisAsyncFree(ac);
+    if (!connected && ac) {
+        redisAsyncDisconnect(ac);
     }
 }
 
