@@ -66,20 +66,17 @@ ASyncRedis::ASyncRedis(int _intval, int cache)
 
 ASyncRedis::~ASyncRedis()
 {
-    redisAsyncDisconnect(ac);
-
     if (loop) {
         aeStop(loop);
-        if (evMain.joinable()) {
-            evMain.join();
-        }
     }
-    loop = nullptr;
+
+    if (evMain.joinable()) {
+        evMain.join();
+    }
 
     if (ac) {
         redisAsyncFree(ac);
     }
-    ac = nullptr;
 }
 
 bool ASyncRedis::WaitForConnected()
