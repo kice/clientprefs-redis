@@ -127,12 +127,17 @@ public:
 
     int ConnectAsync(std::string host, int port, std::string pass)
     {
-        if (!async.Connect(host.c_str(), port)) {
-            return async.GetError();
+        if (async) {
+            delete async;
         }
 
-        async.WaitForConnected();
-        async.Command(("AUTH " + pass).c_str(), [this](const ASyncRedis *c, void *r, void *privdata) {
+        async = new ASyncRedis();
+        if (!async->Connect(host.c_str(), port)) {
+            return async->GetError();
+        }
+
+        async->WaitForConnected();
+        async->Command(("AUTH " + pass).c_str(), [this](const ASyncRedis *c, void *r, void *privdata) {
             redisReply *reply = (redisReply *)r;
             if (reply->type == REDIS_REPLY_STATUS && c->GetError() == REDIS_OK) {
                 this->canAsync = true;
@@ -141,7 +146,7 @@ public:
             }
         }, nullptr);
 
-        return async.GetError();
+        return async->GetError();
     }
 
     bool SELECT_DBID(int dbid)
@@ -155,10 +160,10 @@ public:
             return false;
         }
 
-        if (canAsync) {
-            char buf[128];
+        if (canAsync && async) {
+            char buf[32];
             sprintf(buf, "SELECT %d", dbid);
-            async.Command(buf);
+            async->Command(buf);
         }
         return true;
     }
@@ -174,8 +179,9 @@ public:
             return false;
         }
 
-        if (canAsync) {
-            return async.GetError() == REDIS_OK;
+        if (canAsync && async) {
+            async->Command("PING");
+            return async->GetError() == REDIS_OK;
         }
         return true;
     }
@@ -195,7 +201,7 @@ public:
 
     bool CommandAsync(const char *format, ...)
     {
-        if (!canAsync) {
+        if (!canAsync || !async) {
             return false;
         }
 
@@ -205,7 +211,7 @@ public:
         _vsnprintf(buf, 1024, format, arglist);
         va_end(arglist);
 
-        return async.Command(buf);
+        return async->Command(buf);
     }
 
     bool Execute(const char *format, ...)
@@ -290,6 +296,11 @@ public:
         if (this->ctx != nullptr) {
             redisFree(this->ctx);
         }
+
+        if (async) {
+            delete async;
+        }
+
         return true;
     }
 
@@ -305,7 +316,7 @@ public:
 
     const char *GetASyncErrorStr() const
     {
-        return async.GetErrorStr();
+        return async->GetErrorStr();
     }
 
     //void LockForFullAtomicOperation()
@@ -328,5 +339,5 @@ private:
     redisContext *ctx;
 
     bool canAsync = false;
-    ASyncRedis async;
+    ASyncRedis *async = nullptr;
 };

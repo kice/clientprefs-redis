@@ -88,7 +88,7 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
         pass = DBInfo->pass;
     }
 
-    if (DBInfo->database == nullptr || DBInfo->database[0] != '\x0') {
+    if (DBInfo->database == nullptr || DBInfo->database[0] == '\x0') {
         dbid = 0;
     } else {
         dbid = atoi(DBInfo->database);
@@ -121,16 +121,16 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
                     std::unique_lock<std::mutex> _(connectLock);
                     db = RedisDB::GetRedisDB(host, port, maxTimeout, pass);
-                    if (noasync) {
+                    if (noasync || !db) {
                         continue;
                     }
 
                     if (int err = db->ConnectAsync(host, port, pass)) {
-                        smutils->LogError(myself, "[%d] Cannot use async connection: %d (error: %s).",
+                        fprintf(stderr, "[%d] Cannot use async connection: %d (error: %s).\n",
                             i, err, db->GetASyncErrorStr());
                     } else {
                         // Async connection is available
-                        smutils->LogMessage(myself, "[%d] Connected to %s:%d with non-blocking context.",
+                        fprintf(stderr, "[%d] Connected to %s:%d with non-blocking context.\n",
                             i, host.c_str(), port);
                     }
                 }
@@ -140,7 +140,7 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
                 connectDb();
                 auto reply = db->Run("SCRIPT LOAD %s", GET_CLIENT_COOKIES);
                 if (reply.str != GET_CLIENT_COOKIES_SHA) {
-                    smutils->LogError(myself, "Lua script sha dose not match: except:%s actual:%s",
+                    fprintf(stderr, "Lua script sha dose not match: except:%s actual:%s",
                         GET_CLIENT_COOKIES_SHA, reply.str.c_str());
                 }
             }

@@ -38,7 +38,7 @@
  */
 
 /* Basic information exposed publicly */
-#define SMEXT_CONF_NAME			"Client Preferences (Redis)"
+#define SMEXT_CONF_NAME			"Client Preferences (Redis v2)"
 #define SMEXT_CONF_DESCRIPTION	"Saves client preference settings"
 #define SMEXT_CONF_VERSION		""
 #define SMEXT_CONF_AUTHOR		"AlliedModders forked by KiceQishi"

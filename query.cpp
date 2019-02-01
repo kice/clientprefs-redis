@@ -277,16 +277,10 @@ bool TQueryOp::BindParamsAndRun()
         int cookieId = m_params.cookieId;
         safe_id = safe_id + "." + std::to_string(cookieId);
 
-        bool res = true;
         if (m_database->CanAsync()) {
-            res &= m_database->CommandAsync("SET %s %s", safe_id.c_str(), safe_val.c_str());
-            res &= m_database->CommandAsync("EXPIRE %s %d", safe_id.c_str(), 14 * 24 * 3600); // Set this key expire in 2 weeks
-            return res;
+            return m_database->CommandAsync("SET %s %s EX %d", safe_id.c_str(), safe_val.c_str(), 14 * 24 * 3600); // Set this key expire in 2 weeks
         }
-
-        res &= m_database->Execute("SET %s %s", safe_id.c_str(), safe_val.c_str());
-        res &= m_database->Execute("EXPIRE %s %d", safe_id.c_str(), 14 * 24 * 3600); // Set this key expire in 2 weeks
-        return res;
+        return m_database->Execute("SET %s %s EX %d", safe_id.c_str(), safe_val.c_str(), 14 * 24 * 3600); // Set this key expire in 2 weeks
     }
 
     case Query_SelectId:
