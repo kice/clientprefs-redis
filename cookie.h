@@ -39,6 +39,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <tuple>
 
 #define MAX_NAME_LENGTH 30
 #define MAX_DESC_LENGTH 255
@@ -121,7 +122,7 @@ public:
 
 	void Unload();
 
-	void ClientConnectCallback(int serial, const std::vector<std::pair<Cookie, std::string>> &data);
+	void ClientConnectCallback(int serial, const std::vector<std::tuple<Cookie, std::string>> &data);
 	void InsertCookieCallback(Cookie *pCookie, int dbId);
 	void SelectIdCallback(Cookie *pCookie, int dbId);
 	Cookie *FindCookie(const char *name);

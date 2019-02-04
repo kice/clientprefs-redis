@@ -129,7 +129,7 @@ private:
     async_redis::client *m_database;
     // IDBDriver *m_driver;
     // IQuery *m_pResult;
-    std::vector<std::pair<Cookie, std::string>> m_results;
+    std::vector<std::tuple<Cookie, std::string>> m_results;
 
     /* Query type */
     enum querytype m_type;

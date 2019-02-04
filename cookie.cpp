@@ -201,7 +201,7 @@ void CookieManager::OnClientDisconnecting(int client)
     clientvec.clear();
 }
 
-void CookieManager::ClientConnectCallback(int serial, const std::vector<std::pair<Cookie, std::string>> &data)
+void CookieManager::ClientConnectCallback(int serial, const std::vector<std::tuple<Cookie, std::string>> &data)
 {
     int client;
 
@@ -219,15 +219,15 @@ void CookieManager::ClientConnectCallback(int serial, const std::vector<std::pai
     // unsigned int timestamp;
     // CookieAccess access;
 
-    for (const auto &item : data) {
-        pData = new CookieData(item.second.data());
+    for (const auto &[cookie, value] : data) {
+        pData = new CookieData(value.data());
         pData->changed = false;
 
         pData->timestamp = 0;
 
-        Cookie *parent = FindCookie(item.first.name);
+        Cookie *parent = FindCookie(cookie.name);
         if (parent == NULL) {
-            parent = CreateCookie(item.first.name, item.first.description, item.first.access);
+            parent = CreateCookie(cookie.name, cookie.description, cookie.access);
         }
 
         pData->parent = parent;

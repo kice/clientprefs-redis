@@ -173,7 +173,6 @@ bool TQueryOp::BindParamsAndRun()
         auto cookies = m_database->Command({ "EVALSHA", GET_CLIENT_COOKIES_SHA, "1", steamId }).get();
         if (cookies && cookies->Ok()) {
             if (!cookies->IsArrays()) {
-                // nothing here
                 return true;
             }
 
@@ -191,15 +190,18 @@ bool TQueryOp::BindParamsAndRun()
                     acce = CookieAccess_Public;
                 }
 
+                std::string value;
                 if (cookie[CookieValue].IsString()) {
-                    m_results.push_back({
-                        Cookie(
-                            cookie[CookieName].GetString().c_str(),
-                            cookie[CookieDesc].GetString().c_str(),
-                            acce),
-                            cookie[CookieValue].GetString().c_str()
-                        });
+                    value = cookie[CookieValue].GetString();
                 }
+
+                m_results.push_back({
+                    Cookie(
+                        cookie[CookieName].GetString().c_str(),
+                        cookie[CookieDesc].GetString().c_str(),
+                        acce),
+                    value.c_str()
+                        });
             }
             return true;
         }
@@ -232,22 +234,25 @@ bool TQueryOp::BindParamsAndRun()
             auto desc = _desc.get();
             auto access = _access.get();
 
-            if (value->IsString()) {
-                CookieAccess acce;
-                try {
-                    acce = (CookieAccess)std::stoi(access->GetString());
-                } catch (const std::exception&) {
-                    acce = CookieAccess_Public;
-                }
-
-                m_results.push_back({
-                    Cookie(
-                        cookieName.c_str(),
-                        desc->GetString().c_str(),
-                        acce
-                    ), value->GetString()
-                    });
+            CookieAccess acce;
+            try {
+                acce = (CookieAccess)std::stoi(access->GetString());
+            } catch (const std::exception&) {
+                acce = CookieAccess_Public;
             }
+
+            std::string cookie_value;
+            if (value->IsString()) {
+                cookie_value = value->GetString();
+            }
+
+            m_results.push_back({
+                Cookie(
+                    cookieName.c_str(),
+                    desc->GetString().c_str(),
+                    acce),
+                cookie_value.c_str()
+                });
         }
 
         return true;
