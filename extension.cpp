@@ -128,7 +128,7 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
                     db = nullptr;
                 }
 
-                auto reply = db->Command({ "AUTH", "foobared233" }).get();
+                auto reply = db->Command({ "AUTH", pass }).get();
                 if (!reply || !reply->IsStatus()) {
                     fprintf(stderr, "REDIS ERROR: %s\n", reply->Status());
                     return;

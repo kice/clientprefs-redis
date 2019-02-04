@@ -171,7 +171,12 @@ bool TQueryOp::BindParamsAndRun()
 
         // Try to use cached Lua query first
         auto cookies = m_database->Command({ "EVALSHA", GET_CLIENT_COOKIES_SHA, "1", steamId }).get();
-        if (cookies && cookies->IsArrays()) {
+        if (cookies && cookies->Ok()) {
+            if (!cookies->IsArrays()) {
+                // nothing here
+                return true;
+            }
+
             for (const auto &cookieData : cookies->GetArray()) {
                 if (!cookieData.IsArrays() || cookieData.GetArray().size() != 4) {
                     break;
@@ -186,20 +191,25 @@ bool TQueryOp::BindParamsAndRun()
                     acce = CookieAccess_Public;
                 }
 
-                m_results.push_back({
-                    Cookie(
-                        cookie[CookieName].GetString().c_str(),
-                        cookie[CookieDesc].GetString().c_str(),
-                        acce
-                    ), cookie[CookieValue].GetString().c_str()
-                    });
+                if (cookie[CookieValue].IsString()) {
+                    m_results.push_back({
+                        Cookie(
+                            cookie[CookieName].GetString().c_str(),
+                            cookie[CookieDesc].GetString().c_str(),
+                            acce),
+                            cookie[CookieValue].GetString().c_str()
+                        });
+                }
             }
-
             return true;
         }
 
         // Use normal and slow method, if you have too many cookies (>= 10M), you should use the lua method
         auto keys = m_database->Command({ "KEYS", "cookies.id.*" }).get();
+        if (!keys || !keys->IsArrays()) {
+            return true;
+        }
+
         for (const auto &item : keys->GetArray()) {
             std::string cookieName = item.GetString().substr(11);
 
