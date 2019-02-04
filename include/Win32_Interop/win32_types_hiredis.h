@@ -37,11 +37,11 @@ typedef unsigned __int64  PORT_ULONGLONG;
 typedef double            PORT_LONGDOUBLE;
 
 #ifdef _WIN64
-typedef __int64           ssize_t;
+typedef __int64           _ssize_t;
 typedef __int64           PORT_LONG;
 typedef unsigned __int64  PORT_ULONG;
 #else
-typedef long              ssize_t;
+typedef long              _ssize_t;
 typedef long              PORT_LONG;
 typedef unsigned long     PORT_ULONG;
 #endif
