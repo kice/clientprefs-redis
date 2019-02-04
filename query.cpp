@@ -146,7 +146,7 @@ bool TQueryOp::BindParamsAndRun()
         {
             auto reply = m_database->Command({ "GET", "cookies.id." + safe_name }).get();
             if (reply->IsString()) {
-                m_database->Append({ "SADD", "cookies.list", safe_name });
+                m_database->Append({ "SADD", "cookies.list", safe_name }).Commit();
                 m_insertId = std::stoi(reply->GetString());
                 return true;
             }
@@ -159,8 +159,8 @@ bool TQueryOp::BindParamsAndRun()
         client.Append({ "SADD", "cookies.list", safe_name })
             .Append({ "SET", "cookies.access." + safe_name, std::to_string((int)m_params.cookie->access) })
             .Append({ "SET", "cookies.desc." + safe_name, safe_desc })
-            .Append({ "SET", "cookies.id." + safe_name, std::to_string(m_insertId) });
-
+            .Append({ "SET", "cookies.id." + safe_name, std::to_string(m_insertId) })
+            .Commit();
         return true;
     }
 
@@ -169,37 +169,32 @@ bool TQueryOp::BindParamsAndRun()
         m_results.clear();
         std::string steamId = m_params.steamId;
 
-        auto luaquery = [&] {
-            // Try to use cached Lua query first
-            auto cookies = m_database->Command({ "EVALSHA", GET_CLIENT_COOKIES_SHA, "1", steamId }).get();
-
-            if (cookies->IsArrays()) {
-                for (const auto &cookieData : cookies->GetArray()) {
-                    if (cookieData.IsArrays() || cookieData.GetArray().size() != 4) {
-                        break;
-                    }
-
-                    const auto &cookie = cookieData.GetArray();
-
-                    CookieAccess acce;
-                    try {
-                        acce = (CookieAccess)std::stoi(cookie[CookieAcce].GetString());
-                    } catch (const std::exception&) {
-                        acce = CookieAccess_Public;
-                    }
-
-                    m_results.push_back({
-                        Cookie(
-                            cookie[CookieName].GetString().c_str(),
-                            cookie[CookieDesc].GetString().c_str(),
-                            acce
-                        ), cookie[CookieValue].GetString().c_str()
-                        });
+        // Try to use cached Lua query first
+        auto cookies = m_database->Command({ "EVALSHA", GET_CLIENT_COOKIES_SHA, "1", steamId }).get();
+        if (cookies && cookies->IsArrays()) {
+            for (const auto &cookieData : cookies->GetArray()) {
+                if (!cookieData.IsArrays() || cookieData.GetArray().size() != 4) {
+                    break;
                 }
-            }
-        };
 
-        if (m_results.size()) {
+                const auto &cookie = cookieData.GetArray();
+
+                CookieAccess acce;
+                try {
+                    acce = (CookieAccess)std::stoi(cookie[CookieAcce].GetString());
+                } catch (const std::exception&) {
+                    acce = CookieAccess_Public;
+                }
+
+                m_results.push_back({
+                    Cookie(
+                        cookie[CookieName].GetString().c_str(),
+                        cookie[CookieDesc].GetString().c_str(),
+                        acce
+                    ), cookie[CookieValue].GetString().c_str()
+                    });
+            }
+
             return true;
         }
 
@@ -256,7 +251,7 @@ bool TQueryOp::BindParamsAndRun()
         int cookieId = m_params.cookieId;
         safe_id = safe_id + "." + std::to_string(cookieId);
 
-        m_database->Append({ "SET", safe_id, safe_val, "EX", "1209600" }); // Set this key expire in 2 weeks
+        m_database->Append({ "SET", safe_id, safe_val, "EX", "1209600" }).Commit(); // Set this key expire in 2 weeks
         return true;
     }
 

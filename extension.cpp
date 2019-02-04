@@ -103,11 +103,17 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
         worker = atoi(num_worker);
     }
 
+    bool onlylua = true;
+    const char *slowquery = smutils->GetCoreConfigValue("RedisSlowQuery");
+    if (slowquery) {
+        onlylua = atoi(slowquery) < 1;
+    }
+
     smutils->LogMessage(myself, "Connecting to %s:%d %s password using %d query thread(s).",
         host.c_str(), port, pass.empty() ? "without" : "with", worker);
 
     for (int i = 0; i < worker; ++i) {
-        std::thread([this, i] {
+        std::thread([this, i, onlylua] {
             async_redis::client *db = nullptr;
             auto connectDb = [&]() {
                 while (!db || !db->IsConnected()) {
@@ -128,7 +134,7 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
                     return;
                 }
 
-                db->Append({ "SELECT", std::to_string(dbid) });
+                db->Append({ "SELECT", std::to_string(dbid) }).Commit();
 
                 reply = db->Command({ "SCRIPT", "LOAD", GET_CLIENT_COOKIES }).get();
                 if (!reply) {
