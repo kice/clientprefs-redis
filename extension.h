@@ -38,13 +38,14 @@ extern "C" {
 #define NO_QFORKIMPL
 #include <Win32_Interop/win32fixes.h>
 
-#pragma comment(lib,"hiredis.lib")
-#pragma comment(lib,"Win32_Interop.lib")
+#pragma comment(lib, "hiredis.lib")
+#pragma comment(lib, "Win32_Interop.lib")
 #endif
 }
 
 #include "TQueue.h"
-#include "RedisDB.h"
+#include "client.h"
+#include "reply.h"
 
 #include <stdlib.h>
 #include <stdarg.h>

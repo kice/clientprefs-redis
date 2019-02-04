@@ -116,7 +116,7 @@ public:
     /* Params to be bound */
     ParamData m_params;
 
-    inline RedisDB *GetDB()
+    inline async_redis::client *GetDB()
     {
         return m_database;
     }
@@ -126,7 +126,7 @@ public:
     int PullQuerySerial();
 
 private:
-    RedisDB *m_database;
+    async_redis::client *m_database;
     // IDBDriver *m_driver;
     // IQuery *m_pResult;
     std::vector<std::pair<Cookie, std::string>> m_results;

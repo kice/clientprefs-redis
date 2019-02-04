@@ -98,52 +98,57 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
     const char *num_worker = smutils->GetCoreConfigValue("RedisQueryThread");
     if (num_worker == NULL) {
-        worker = 4;
+        worker = 1;
     } else {
         worker = atoi(num_worker);
-    }
-
-    bool noasync = false;
-    const char *_noasync = smutils->GetCoreConfigValue("RedisDBNoASync");
-    if (_noasync) {
-        noasync = atoi(_noasync) != 0;
     }
 
     smutils->LogMessage(myself, "Connecting to %s:%d %s password using %d query thread(s).",
         host.c_str(), port, pass.empty() ? "without" : "with", worker);
 
     for (int i = 0; i < worker; ++i) {
-        std::thread([this, i, noasync] {
-            RedisDB *db = nullptr;
+        std::thread([this, i] {
+            async_redis::client *db = nullptr;
             auto connectDb = [&]() {
-                while (db == nullptr) {
+                while (!db || !db->IsConnected()) {
+                    db = new async_redis::client();
+
                     Sleep(3000);
-
-                    std::unique_lock<std::mutex> _(connectLock);
-                    db = RedisDB::GetRedisDB(host, port, maxTimeout, pass);
-                    if (noasync || !db) {
-                        continue;
+                    if (db->Connect(host, port, maxTimeout)) {
+                        break;
                     }
 
-                    if (int err = db->ConnectAsync(host, port, pass)) {
-                        fprintf(stderr, "[%d] Cannot use async connection: %d (error: %s).\n",
-                            i, err, db->GetASyncErrorStr());
-                    } else {
-                        // Async connection is available
-                        fprintf(stderr, "[%d] Connected to %s:%d with non-blocking context.\n",
-                            i, host.c_str(), port);
-                    }
+                    delete db;
+                    db = nullptr;
+                }
+
+                auto reply = db->Command({ "AUTH", "foobared233" }).get();
+                if (!reply || !reply->IsStatus()) {
+                    fprintf(stderr, "REDIS ERROR: %s\n", reply->Status());
+                    return;
+                }
+
+                db->Append({ "SELECT", std::to_string(dbid) });
+
+                reply = db->Command({ "SCRIPT", "LOAD", GET_CLIENT_COOKIES }).get();
+                if (!reply) {
+                    fprintf(stderr, "Invalid reply when loading lua script\n");
+                    return;
+                }
+
+                if (!reply->IsString()) {
+                    fprintf(stderr, "Load lua script error: %s\n", reply->Status());
+                    return;
+                }
+
+                if (reply->GetString() != GET_CLIENT_COOKIES_SHA) {
+                    fprintf(stderr, "Lua script sha dose not match: except:%s actual:%s\n",
+                        GET_CLIENT_COOKIES_SHA, reply->GetString().c_str());
+                    return;
                 }
             };
 
-            {
-                connectDb();
-                auto reply = db->Run("SCRIPT LOAD %s", GET_CLIENT_COOKIES);
-                if (reply.str != GET_CLIENT_COOKIES_SHA) {
-                    fprintf(stderr, "Lua script sha dose not match: except:%s actual:%s",
-                        GET_CLIENT_COOKIES_SHA, reply.str.c_str());
-                }
-            }
+            connectDb();
 
             while (true) {
                 auto op = tqq->GetQuery();
@@ -152,13 +157,14 @@ bool ClientPrefs::SDK_OnLoad(char *error, size_t maxlength, bool late)
                     break;
                 }
 
-                if (db == nullptr || !db->Alive()) {
+                if (db == nullptr || !db->IsConnected()) {
                     delete db;
                     db = nullptr;
                     connectDb();
                 }
 
-                db->SELECT_DBID(dbid);
+                db->Commit();
+
                 op->SetDatabase(db);
                 op->RunThreadPart();
                 tqq->PutResult(op);
